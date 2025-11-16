@@ -23,15 +23,15 @@ repos:
     rev: 25.11.0
     hooks:
       - id: black
-        exclude: ^(dist/|build/|.venv/|.uv/)
+        exclude: ^(dist/|build/|\.venv/|\.uv/|\.mypy_cache/|\.pytest_cache/|\.ruff_cache/)
 
   # Mypy: type-check Python
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.18.2
     hooks:
       - id: mypy
-        args: [--ignore-missing-imports]
-        exclude: ^(dist/|build/|.venv/|.uv/|tests/fixtures/)
+        args: [--ignore-missing-imports, --disable-error-code=import-untyped]
+        exclude: ^(dist/|build/|\.venv/|\.uv/|\.mypy_cache/|\.pytest_cache/|\.ruff_cache/)
 
   # Prettier: format Markdown/YAML/JSON/etc.
   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -40,3 +40,13 @@ repos:
       - id: prettier
         args: [--write]
         types_or: [markdown, yaml, json, html, css, javascript]
+
+  # Pytest: run test suite
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (unit tests)
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
