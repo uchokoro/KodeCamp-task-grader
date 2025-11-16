@@ -27,9 +27,7 @@ class FakeResponse:
         if not self.ok or self.status_code >= 400:
             import requests
 
-            raise requests.exceptions.HTTPError(
-                f"{self.status_code} error", response=self
-            )
+            raise requests.exceptions.HTTPError(f"{self.status_code} error")
 
 
 class FakeSession:
