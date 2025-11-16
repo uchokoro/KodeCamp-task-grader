@@ -8,11 +8,12 @@ __pycache__/
 *$py.class
 *.so
 
-# Virtual environments
+# Environments
 .venv/
 .env/
 venv/
 ENV/
+*.env
 
 # UV cache & build artifacts
 .uv/
@@ -25,13 +26,14 @@ wheels/
 *.egg-info/
 *.egg
 
-# Logs & local runs
+# Logs, local runs and temp files
 *.log
 logs/
 results/
 outputs/
 debug/
 reports/
+downloaded*/
 
 # IDE & editor folders
 .vscode/
