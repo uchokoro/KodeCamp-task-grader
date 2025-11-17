@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any, Iterable, get_args
 from string import Formatter
-from .rubric import Rubric
+from .rubric import ScoreScale, Rubric
 
 
 class PromptBuilder:
@@ -80,7 +80,7 @@ class PromptBuilder:
     def with_score_scale_metadata(
         self,
         literal_type: Any,
-        scale_descriptions: Mapping[str, str],
+        scale_descriptions: Mapping[ScoreScale, str],
         values_placeholder: str = "{score_scale_values}",
         ranges_placeholder: str = "{score_scale_ranges}",
     ) -> "PromptBuilder":
@@ -246,7 +246,7 @@ class PromptBuilder:
         base_template: str,
         rubric: Rubric,
         score_scale_literal: Any,
-        scale_descriptions: Mapping[str, str],
+        scale_descriptions: Mapping[ScoreScale, str],
         additional_notes: str = "",
     ) -> "PromptBuilder":
         """
