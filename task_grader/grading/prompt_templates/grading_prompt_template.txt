@@ -43,7 +43,8 @@ Note:
 3. Use only the keys specified in the response format.
 4. Keep `intro` to exactly one sentence, and `overall_evaluation` to 3–5 sentences in a single paragraph.
 5. Avoid Markdown formatting (**bold**, bullet lists, or headings) inside the YAML values.
-6. Use the exact `id` and `name` for each criterion as they appear in the rubric; no modification or inventing new ones.
+6. Use the exact "id" and "name" for each criterion as they appear in the rubric; no modification or inventing new ones.
+   Also, ensure that you match the case.
 7. For score_scale, use exactly one of {score_scale_values}, as specified for that criterion in the rubric.
 8. Copy the scale for each criterion exactly from the rubric.
 9. Base the overall_verdict on how well the submission satisfies the rubric criteria (e.g. "excellent", "good", "fair", "poor", or "fail"). Treat "fail" as appropriate when the submission substantially fails to meet key criteria or would clearly fall below the passing threshold described in the rubric.
