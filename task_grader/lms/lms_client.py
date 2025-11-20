@@ -191,6 +191,7 @@ class LMSClient:
         resp.raise_for_status()
         task = resp.json()
 
+        print(task)
         if not isinstance(task, dict) or not task.get("submissions"):
             raise RuntimeError("Could not retrieve the expected task data")
 
