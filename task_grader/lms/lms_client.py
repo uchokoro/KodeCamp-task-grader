@@ -2,7 +2,7 @@ import datetime
 import os
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 import requests
 
@@ -179,7 +179,7 @@ class LMSClient:
         self,
         task_id: str,
         workspace_slug: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetch task details along with its submissions.
         """
@@ -196,11 +196,69 @@ class LMSClient:
 
         return task
 
+    def get_tasks_with_submissions(
+        self,
+        workspace_slug: str,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        if not self.is_token_valid():
+            self.login()
+
+        tasks_retrieval_url = f"{self.base_url}/{workspace_slug}/tasks"
+        params = {
+            "offset": offset,
+            "limit": limit,
+        }
+        resp = self._session.get(tasks_retrieval_url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not isinstance(data, dict) or not data.get("tasks"):
+            raise RuntimeError("Could not retrieve the expected tasks data")
+
+        if not isinstance(
+            data["tasks"], list
+        ) or not self._is_list_of_dicts_with_key_whose_val_is_list(
+            item=data["tasks"], given_key="submissions"
+        ):
+            raise RuntimeError(
+                "Retrieved tasks data does not match the expected format"
+            )
+
+        return data["tasks"]
+
     def get_token(self):
         return self._token
 
     def get_session(self):
         return self._session
+
+    @staticmethod
+    def _is_list_of_dicts_with_key_whose_val_is_list(item: Any, given_key: str) -> bool:
+        """
+        Helper method to check if a data structure is a list of dictionaries containing a given key.
+        :param item: the data structure to check
+        :param given_key: the key to check
+        :return: `True` if `item` is an empty list,
+                 or a list of dictionaries with the key, `given_key`.
+        """
+        if not isinstance(item, list):
+            return False
+
+        if len(item) == 0:
+            return True
+
+        if any(not isinstance(item, dict) for item in item):
+            return False
+
+        if given_key not in item[0].keys():
+            return False
+
+        if not isinstance(item[0][given_key], list):
+            return False
+
+        return True
 
     @classmethod
     def from_env(cls) -> Self:

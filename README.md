@@ -149,12 +149,16 @@ rubric = Rubric(
 - `"0-10"`: Ten-point scale
 - `"percentage"`: 0-100 percentage
 
-### 2. Fetching Submissions from LMS
+### 2. Fetching Tasks and their Submissions from LMS
 
 ```python
 from task_grader.lms.lms_client import LMSClient, SubmissionCategory
 
-# Initialize LMS client from environment variables
+# -------------------------------- #
+# Initialize LMS client and login  #
+# -------------------------------- #
+
+# Initialize from environment variables
 client = LMSClient.from_env()
 
 # Or initialize manually
@@ -167,13 +171,16 @@ client = LMSClient(
 # Login
 client.login()
 
-# Fetch submissions for a specific task
+# --------------------------------------------------------------------------------- #
+# Fetch a given number of submissions in a particular category for a specific task  #
+# --------------------------------------------------------------------------------- #
+
 submissions = client.get_task_submissions(
-    task_id="task_001",
-    workspace_slug="kodecamp-cohort-5",
-    category=SubmissionCategory.SUBMITTED,  # or GRADED, ALL
-    offset=0,
-    limit=100
+   task_id="task_001",
+   workspace_slug="kodecamp-cohort-5",
+   category=SubmissionCategory.SUBMITTED,  # or GRADED, ALL
+   offset=0,
+   limit=100
 )
 
 # Each submission contains metadata
@@ -183,7 +190,45 @@ for submission in submissions:
     print(f"Status: {submission.submission_status}")
     print(f"Current Score: {submission.score}")
 
-# Logout when done
+# ----------------------------------------------- #
+# Fetch a given task with all of its submissions  #
+# ----------------------------------------------- #
+
+task = client.get_task_with_submissions(
+   task_id="task_001",
+   workspace_slug="kodecamp-cohort-5",
+)
+
+# The task contains a submission contains a list of submission-metadata dictionaries
+for submission in task["submissions"]:
+    print(f"Trainee ID: {submission['student_id']}")
+    print(f"Submission URLs: {submission['submission_urls']}")
+    print(f"Status: {submission['status']}")
+    print(f"Current Score: {submission['score']}")
+
+# ----------------------------------------------- #
+# Fetch all tasks with their submissions  #
+# ----------------------------------------------- #
+
+#### Fetch a given number of tasks with their submissions
+
+tasks = client.get_tasks_with_submissions(
+   workspace_slug="kodecamp-cohort-5",
+   offset=0,
+   limit=100
+)
+
+# tasks is a list of task metadata including their submissions
+for task in tasks:
+    print(f"Task ID: {task['id']}")
+    print(f"Task title: {task['title']}")
+    print(f"Task Description: {task['description']}")
+    print(f"Task status: {task['status']}")
+    print(f"Maximum possible score: {task['points']}")
+    print(f"Minimum passing score: {task['cutoff']}")
+    print(f"Number of submissions: {len(task['submissions'])}")
+
+#Logout when done
 client.logout()
 ```
 

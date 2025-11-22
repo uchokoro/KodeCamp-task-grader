@@ -1,5 +1,6 @@
 import datetime as dt
 import pytest
+import requests
 
 from task_grader.lms.lms_client import (
     LMSClient,
@@ -379,7 +380,321 @@ def test_get_task_submissions_validates_shape_and_raises(monkey_session, creds):
             client.get_task_submissions("t1", "ws")
 
 
-# --- from_env -----------------------------------------------------------------
+def test_get_task_with_submissions_logs_in_and_fetches_task(monkey_session, creds):
+    """Test successful retrieval of a task and its submissions."""
+    task_id = "ai-project-1"
+    workspace_slug = "dev-cohort"
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Mock data for the successful response
+    task_payload = {
+        "id": task_id,
+        "title": "AI Project",
+        "submissions": [{"id": 1, "score": 10}],  # Must contain 'submissions' key
+        "description": "Details about the project.",
+    }
+
+    # Queuing responses: Login (post), Token Check (post), Task Fetch (get)
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),  # login
+            FakeResponse(json_data={"email": creds["email"]}),  # is_token_valid
+        ],
+        get=[FakeResponse(json_data=task_payload)],
+    )
+    monkey_session(fake)
+
+    client = LMSClient(**creds)
+    # The first call to is_token_valid() within the method will trigger login
+    result = client.get_task_with_submissions(
+        task_id=task_id, workspace_slug=workspace_slug
+    )
+
+    # Assertions
+    expected_url = f"{creds['base_url']}/{workspace_slug}/tasks/{task_id}"
+    assert fake.last_get["url"] == expected_url
+    assert result == task_payload
+    assert result["id"] == task_id
+
+
+def test_get_task_with_submissions_raises_on_http_error(monkey_session, creds):
+    """Test that HTTP errors are correctly propagated."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Queuing responses: Login (post), Token Check (post), Task Fetch (get - FAILURE)
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),
+            FakeResponse(json_data={"email": creds["email"]}),
+        ],
+        get=[FakeResponse(ok=False, status_code=404, text="Not Found")],
+    )
+    monkey_session(fake)
+
+    client = LMSClient(**creds)
+
+    with pytest.raises(requests.exceptions.HTTPError) as excinfo:
+        client.get_task_with_submissions(task_id="missing-task", workspace_slug="ws")
+
+    assert "404 error" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "bad_payload",
+    [
+        "not a dict",
+        {},  # missing "submissions" key
+        {
+            "title": "Task",
+            "submissions": [],
+        },  # Correct key but still testing the runtime error check
+    ],
+)
+def test_get_task_with_submissions_raises_on_bad_data_shape(
+    monkey_session, creds, bad_payload
+):
+    """Test that RuntimeError is raised if the returned JSON is malformed."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Queuing responses: Login (post), Token Check (post), Task Fetch (get - BAD DATA)
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),
+            FakeResponse(json_data={"email": creds["email"]}),
+        ],
+        get=[FakeResponse(json_data=bad_payload)],
+    )
+    monkey_session(fake)
+    client = LMSClient(**creds)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.get_task_with_submissions(task_id="t", workspace_slug="ws")
+
+    assert "Could not retrieve the expected task data" in str(excinfo.value)
+
+
+def test_get_task_submissions_raises_on_http_error(monkey_session, creds):
+    """Test that HTTP errors are correctly propagated in get_task_submissions."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Login and token check responses (Success)
+    post_responses = [
+        FakeResponse(json_data={"access_token": "tok", "expires": future}),
+        FakeResponse(json_data={"email": creds["email"]}),
+    ]
+
+    # GET response (Failure)
+    get_responses = [
+        FakeResponse(ok=False, status_code=403, text="Forbidden"),
+    ]
+
+    fake = FakeSession(post=post_responses, get=get_responses)
+    monkey_session(fake)
+    client = LMSClient(**creds)
+
+    with pytest.raises(requests.exceptions.HTTPError) as excinfo:
+        client.get_task_submissions(task_id="t1", workspace_slug="ws1")
+
+    assert "403 error" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "bad_payload",
+    [
+        {"submissions": "not a list", "students": []},  # Submissions is wrong type
+        {"submissions": [], "students": "not a list"},  # Students is wrong type
+        {"submissions": "not a list", "students": "not a list"},
+    ],
+)
+def test_get_task_submissions_raises_on_non_list_data(
+    monkey_session, creds, bad_payload
+):
+    """Test that RuntimeError is raised if 'submissions' or 'students' are not lists."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Login and token check responses (Success)
+    post_responses = [
+        FakeResponse(json_data={"access_token": "tok", "expires": future}),
+        FakeResponse(json_data={"email": creds["email"]}),
+    ]
+
+    # GET response (Bad data)
+    get_responses = [FakeResponse(json_data=bad_payload)]
+
+    fake = FakeSession(post=post_responses, get=get_responses)
+    monkey_session(fake)
+    client = LMSClient(**creds)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.get_task_submissions(task_id="t1", workspace_slug="ws1")
+
+    assert "Retrieved submissions data does not match the expected format" in str(
+        excinfo.value
+    ) or "Could not retrieve the expected task submissions data" in str(excinfo.value)
+
+
+# --- get_task_with_submissions ------------------------------------------------
+
+
+def test_get_tasks_with_submissions_success_and_params(monkey_session, creds):
+    """Test successful retrieval of multiple tasks with correct pagination params."""
+    workspace_slug = "dev-cohort"
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Mock data must contain the nested submissions structure defined in the function
+    tasks_payload = {
+        "tasks": [
+            {
+                "id": "task-a",
+                "title": "Task A",
+                "submissions": [{"id": 1}],
+            },
+            {
+                "id": "task-b",
+                "title": "Task B",
+                "submissions": [{"id": 2}],
+            },
+        ]
+    }
+
+    # Queuing responses: Login (post), Token Check (post), Tasks Fetch (get)
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),  # login
+            FakeResponse(json_data={"email": creds["email"]}),  # is_token_valid
+        ],
+        get=[FakeResponse(json_data=tasks_payload)],
+    )
+    monkey_session(fake)
+
+    client = LMSClient(**creds)
+    result = client.get_tasks_with_submissions(
+        workspace_slug=workspace_slug,
+        offset=20,
+        limit=50,
+    )
+
+    # Assertions
+    expected_url = f"{creds['base_url']}/{workspace_slug}/tasks"
+    assert fake.last_get["url"] == expected_url
+    assert fake.last_get["params"] == {"offset": 20, "limit": 50}
+    assert result == tasks_payload["tasks"]
+    assert isinstance(result, list)
+    assert len(result) == 2
+
+
+def test_get_tasks_with_submissions_raises_on_http_error(monkey_session, creds):
+    """Test that HTTP errors are correctly propagated."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Queuing responses: Login (post), Token Check (post), Tasks Fetch (get - FAILURE)
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),
+            FakeResponse(json_data={"email": creds["email"]}),
+        ],
+        get=[FakeResponse(ok=False, status_code=500, text="Server Error")],
+    )
+    monkey_session(fake)
+
+    client = LMSClient(**creds)
+
+    with pytest.raises(requests.exceptions.HTTPError) as excinfo:
+        client.get_tasks_with_submissions(workspace_slug="ws")
+
+    assert "500 error" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "bad_payload",
+    [
+        "not a dict",
+        {},  # missing "tasks" key
+        {"tasks": "not a list"},  # incorrect type for "tasks"
+    ],
+)
+def test_get_tasks_with_submissions_raises_on_missing_keys(
+    monkey_session, creds, bad_payload
+):
+    """Test that RuntimeError is raised if the top-level keys are missing or malformed."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),
+            FakeResponse(json_data={"email": creds["email"]}),
+        ],
+        get=[FakeResponse(json_data=bad_payload)],
+    )
+    monkey_session(fake)
+    client = LMSClient(**creds)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.get_tasks_with_submissions(workspace_slug="ws")
+
+    assert "Could not retrieve the expected tasks data" in str(
+        excinfo.value
+    ) or "Retrieved tasks data does not match the expected format" in str(excinfo.value)
+
+
+def test_get_tasks_with_submissions_raises_on_malformed_nested_data(
+    monkey_session, creds
+):
+    """Test that RuntimeError is raised if the nested 'submissions' key is missing or not a list."""
+    future = (dt.datetime.now() + dt.timedelta(hours=1)).isoformat()
+
+    # Payload fails because data["tasks"] is a list, but it lacks the nested submissions key/type check.
+    # The failing check: `not data["tasks"].get("submissions")`
+    bad_payload = {
+        "tasks": [
+            {"id": "task-1", "title": "Task 1", "submissions": "not a list"},
+            {"id": "task-2", "title": "Task 2"},  # Missing "submissions"
+        ]
+    }
+
+    fake = FakeSession(
+        post=[
+            FakeResponse(json_data={"access_token": "tok", "expires": future}),
+            FakeResponse(json_data={"email": creds["email"]}),
+        ],
+        get=[FakeResponse(json_data=bad_payload)],
+    )
+    monkey_session(fake)
+    client = LMSClient(**creds)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.get_tasks_with_submissions(workspace_slug="ws")
+
+    assert "Retrieved tasks data does not match the expected format" in str(
+        excinfo.value
+    )
+
+
+# --- __init__ and from_env -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "input_url, expected_url",
+    [
+        ("https://lms.example.com/api", "https://lms.example.com/api"),  # No change
+        (
+            "https://lms.example.com/api/",
+            "https://lms.example.com/api",
+        ),  # Trailing slash removed
+        (
+            "https://lms.example.com/",
+            "https://lms.example.com",
+        ),  # Trailing slash on root
+    ],
+)
+def test_lms_client_init_normalizes_base_url(input_url, expected_url):
+    """Test that the trailing slash is correctly removed from base_url."""
+    client = LMSClient(
+        base_url=input_url,
+        email="test@a.com",
+        password="p",
+    )
+    assert client.base_url == expected_url
 
 
 def test_from_env_success(monkeypatch):
