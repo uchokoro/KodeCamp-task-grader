@@ -60,7 +60,9 @@ class Criterion:
         if self.weight <= 0:
             raise ValueError(f"Invalid weight: {self.weight}. Must be positive")
 
-    def save_to_json(self, dest_dir: str | Path, filename: str) -> None:
+    def save_to_json(
+        self, dest_dir: str | Path, filename: str, indent: int = 4
+    ) -> None:
         """Save a Criterion object to a JSON file"""
         if not isinstance(dest_dir, Path):
             dest_dir = Path(dest_dir)
@@ -71,7 +73,7 @@ class Criterion:
         filepath: Path = dest_dir / f"{filename}.json"
 
         with open(filepath, "w") as f:
-            json.dump(asdict(self), f, indent=4)
+            json.dump(asdict(self), f, indent=indent)
 
     @classmethod
     def load_from_json(cls, source_dir: str | Path, filename: str) -> "Criterion":
@@ -110,7 +112,9 @@ class Rubric:
                 f"Invalid min_passing_score: {self.min_passing_score}. Must be less than or equal to overall_max_score"
             )
 
-    def save_to_json(self, dest_dir: str | Path, filename: str) -> None:
+    def save_to_json(
+        self, dest_dir: str | Path, filename: str, indent: int = 4
+    ) -> None:
         """Save a Rubric object to a JSON file"""
         if not isinstance(dest_dir, Path):
             dest_dir = Path(dest_dir)
@@ -121,7 +125,7 @@ class Rubric:
         filepath: Path = dest_dir / f"{filename}.json"
 
         with open(filepath, "w") as f:
-            json.dump(asdict(self), f, indent=4)
+            json.dump(asdict(self), f, indent=indent)
 
     @classmethod
     def load_from_json(cls, source_dir: str | Path, filename: str) -> "Rubric":
