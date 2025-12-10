@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
+from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_core.language_models import BaseChatModel
 
@@ -103,7 +105,7 @@ class LLMTaskEvaluator:
         cls,
         model_name: str,
         prompt_template_path: str | Path,
-        api_key: str = None,
+        api_key: str | None = None,
         temperature: float = 0.0,
         **groq_kwargs: Any,
     ) -> "LLMTaskEvaluator":
@@ -111,7 +113,8 @@ class LLMTaskEvaluator:
         Convenience constructor that builds a Groq LLM and loads the base
         grading prompt template from disk.
         """
-        from langchain_groq import ChatGroq
+        if api_key is None:
+            api_key = os.getenv("GROQ_API_KEY")
 
         llm = ChatGroq(
             model=model_name,
@@ -186,7 +189,6 @@ class LLMTaskEvaluator:
 
         # Call the LLM
         llm_output = self._llm.invoke(prompt)
-        # For ChatOllama / LC chat models, invoke() returns a BaseMessage with .content
         raw_text = getattr(llm_output, "content", str(llm_output))
 
         # Extract YAML block and parse
