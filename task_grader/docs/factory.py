@@ -6,7 +6,10 @@ class SubmissionDownloaderFactory:
         self._downloaders = {}
 
     def register_downloader(
-        self, key: str, downloader: SubmissionDownloader, description: str | None = None
+        self,
+        key: str,
+        downloader: type[SubmissionDownloader],
+        description: str | None = None,
     ) -> None:
         if not description:
             description = downloader.get_description()
