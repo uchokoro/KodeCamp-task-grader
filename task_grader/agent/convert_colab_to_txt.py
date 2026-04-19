@@ -76,22 +76,3 @@ def extract_ipynb_to_txt(
         print(f"Error: The file '{ipynb_filepath}' was not found.")
     except Exception as ex:
         print(f"An error occurred: {ex}")
-
-
-if not source_dir:
-    raise ValueError("No source directory specified")
-
-source_dir_path = Path(source_dir)
-
-if not source_dir_path.is_dir():
-    raise NotADirectoryError(
-        f"Source directory '{source_dir}' is not a valid  directory"
-    )
-
-# Extract the `ipynb` filenames from source dir without the extension
-filenames = (
-    p.stem for p in source_dir_path.iterdir() if p.is_file() and p.suffix == ".ipynb"
-)
-
-for file_name in filenames:
-    extract_ipynb_to_txt(ipynb_dir=source_dir_path, filename=file_name)
