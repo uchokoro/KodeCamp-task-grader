@@ -20,9 +20,6 @@ def _build_score_scale_descriptions(
 ) -> dict[ScoreScale, str]:
     """
     Generate human-readable descriptions for each score scale from its numeric range.
-
-    This keeps SCORE_SCALE_NUMERIC_RANGES as the single source of truth, and
-    avoids duplicating the same information in two separate dicts.
     """
     descriptions: dict[ScoreScale, str] = {}
 
