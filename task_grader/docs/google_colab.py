@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from requests import Response, Session
 from urllib.parse import urlparse, parse_qs
-from .generic import SubmissionDownloader
+from .generic import FileDownloader
 
 
 def extract_drive_file_id(url: str) -> str | None:
@@ -37,7 +37,7 @@ def extract_drive_file_id(url: str) -> str | None:
     return None
 
 
-class GoogleColabDownloader(SubmissionDownloader):
+class GoogleColabDownloader(FileDownloader):
     """
     Download a Google Colab notebook from its URL.
 
@@ -52,10 +52,6 @@ class GoogleColabDownloader(SubmissionDownloader):
 
     def __init__(self, session: Session | None = None) -> None:
         super().__init__(session)
-
-    @classmethod
-    def get_description(cls) -> str | None:
-        return cls.__doc__ or None
 
     def download_as(
         self,

@@ -92,8 +92,8 @@ def download_submissions(
         }
 
         try:
-            _ = downloader.download_as(
-                doc_url=submission_url, dest_dir=download_dir, filename=filename
+            _ = downloader.download(
+                url=submission_url, dest_dir=download_dir, filename=filename
             )
             download_count += 1
         except Exception as e:

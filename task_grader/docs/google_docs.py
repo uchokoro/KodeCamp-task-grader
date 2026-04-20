@@ -1,7 +1,7 @@
 import os
 import re
 from requests import Session
-from .generic import SubmissionDownloader
+from .generic import FileDownloader
 
 # Pattern for document/d/<ID>
 _DOC_ID_RE = re.compile(r"/document/d/([a-zA-Z0-9_-]+)")
@@ -22,7 +22,7 @@ def extract_doc_id(doc_url: str) -> str | None:
     return None
 
 
-class GoogleDocsDownloader(SubmissionDownloader):
+class GoogleDocsDownloader(FileDownloader):
     """
     Download Google Docs document from its URL.
     Expects the doc to be publicly accessible
@@ -31,10 +31,6 @@ class GoogleDocsDownloader(SubmissionDownloader):
 
     def __init__(self, session: Session | None = None) -> None:
         super().__init__(session)
-
-    @classmethod
-    def get_description(cls) -> str | None:
-        return cls.__doc__ or None
 
     def download_as(
         self,
