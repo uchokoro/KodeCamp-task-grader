@@ -5,12 +5,13 @@ from enum import StrEnum
 
 from dotenv import find_dotenv, load_dotenv
 
-from task_grader.lms.lms_client import LMSClient, SubmissionCategory
-from task_grader.docs.factory import SubmissionDownloaderFactory
-from task_grader.docs.generic import SubmissionDownloader
-
-from task_grader.docs.google_docs import GoogleDocsDownloader
-from task_grader.docs.google_colab import GoogleColabDownloader
+from ...docs import (
+    GoogleColabDownloader,
+    GoogleDocsDownloader,
+    SubmissionDownloader,
+    SubmissionDownloaderFactory,
+)
+from ...lms import LMSClient, SubmissionCategory
 
 
 _ = load_dotenv(find_dotenv())

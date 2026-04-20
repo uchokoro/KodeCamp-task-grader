@@ -7,7 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from task_grader.grading.rubric import Criterion, Rubric, ScoreScale
+from ...grading import Criterion, Rubric, ScoreScale
 
 
 SchemaValue = str | dict[str, Any]

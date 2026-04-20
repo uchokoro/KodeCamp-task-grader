@@ -7,10 +7,10 @@ from dotenv import find_dotenv, load_dotenv
 from langchain_ollama import ChatOllama
 from langchain_groq import ChatGroq
 
-from task_grader.agent.convert_colab_to_txt import extract_ipynb_to_txt
-from task_grader.agent.task_grading_setup import build_rubric, extract_txt_file_contents
-from task_grader.grading.rubric import Rubric
-from task_grader.grading.evaluator import EvaluationResult, LLMTaskEvaluator
+from .convert_colab_to_txt import extract_ipynb_to_txt
+from .task_grading_setup import build_rubric, extract_txt_file_contents
+from ...grading import EvaluationResult, LLMTaskEvaluator, Rubric
+
 
 _ = load_dotenv(find_dotenv())
 
@@ -32,7 +32,7 @@ def grade_task(
     name_to_submission_id_mapping: dict[str, dict[str, str]],
     submissions_dir: str | Path = submissions_folder,
     is_colab_submissions: bool = True,
-    submissions_subdir_name: str = "as_text_text",
+    submissions_subdir_name: str = "as_text",
     task_desc_filepath: str | Path = task_desc_path,
     rubric_gen_prompt_filepath: str | Path = rubric_gen_prompt_path,
     rubric_dir: str | Path = rubric_directory,
