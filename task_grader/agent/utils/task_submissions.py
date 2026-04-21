@@ -2,12 +2,14 @@ import os
 import json
 from dataclasses import asdict
 from enum import StrEnum
+from typing import Any
 
 from dotenv import find_dotenv, load_dotenv
 
 from ...docs import (
     GoogleColabDownloader,
     GoogleDocsDownloader,
+    GoogleDriveDownloader,
     SubmissionDownloader,
     SubmissionDownloaderFactory,
 )
@@ -23,11 +25,13 @@ _doc_download_dir = os.getenv("DOCUMENTS_DOWNLOAD_FOLDER", "")
 class SubmissionFormat(StrEnum):
     COLAB = "google_colab"
     DOC = "google_doc"
+    DRIVE = "google_drive_folder"
 
 
 submission_format_mapping: dict[SubmissionFormat, type[SubmissionDownloader]] = {
     SubmissionFormat.COLAB: GoogleColabDownloader,
     SubmissionFormat.DOC: GoogleDocsDownloader,
+    SubmissionFormat.DRIVE: GoogleDriveDownloader,
 }
 
 
@@ -59,7 +63,7 @@ def download_submissions(
     workspace_slug: str = _workspace_slug,
     submission_category: SubmissionCategory = SubmissionCategory.SUBMITTED,
     max_submissions_to_download: int = 2000,
-) -> None:
+) -> dict[str, Any]:
     # Instantiate the LMS client and confirm that access token is `None` by default
     lms_client = LMSClient.from_env()
 
@@ -103,5 +107,5 @@ def download_submissions(
     print(f"Download completed: {download_count} submission files downloaded.")
     print("\n\n----------------------\nProblem submissions:")
     print(json.dumps(problem_submissions, indent=4))
-    print("\n\n----------------------\nName to submission id mapping:")
-    print(json.dumps(name_to_submission_id_mapping, indent=4))
+
+    return name_to_submission_id_mapping
