@@ -1,6 +1,5 @@
 import os
 import re
-from requests import Session
 from .generic import FileDownloader
 
 # Pattern for document/d/<ID>
@@ -28,9 +27,6 @@ class GoogleDocsDownloader(FileDownloader):
     Expects the doc to be publicly accessible
     (e.g. 'Anyone with the link can view').
     """
-
-    def __init__(self, session: Session | None = None) -> None:
-        super().__init__(session)
 
     def download_as(
         self,

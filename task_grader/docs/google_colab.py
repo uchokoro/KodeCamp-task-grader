@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from requests import Response, Session
+from requests import Response
 from urllib.parse import urlparse, parse_qs
 from .generic import FileDownloader
 
@@ -49,9 +49,6 @@ class GoogleColabDownloader(FileDownloader):
     """
 
     _DOWNLOAD_URL = "https://drive.google.com/uc?export=download"
-
-    def __init__(self, session: Session | None = None) -> None:
-        super().__init__(session)
 
     def download_as(
         self,

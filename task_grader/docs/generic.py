@@ -14,7 +14,13 @@ class SubmissionDownloader(ABC):
         return cls.__doc__ or None
 
     @abstractmethod
-    def download(self, url: str, dest_dir: str, filename: str | None = None) -> str:
+    def download(
+        self,
+        url: str,
+        dest_dir: str,
+        filename: str | None = None,
+        overwrite: bool = False,
+    ) -> str:
         """The generic download action shared by all types."""
         pass
 
@@ -36,7 +42,13 @@ class FileDownloader(SubmissionDownloader, ABC):
         """Specific method for files that require format-shifting."""
         pass
 
-    def download(self, url: str, dest_dir: str, filename: str | None = None) -> str:
+    def download(
+        self,
+        url: str,
+        dest_dir: str,
+        filename: str | None = None,
+        overwrite: bool = False,
+    ) -> str:
         # Calls the specific method with default format
         return self.download_as(url, dest_dir, filename)
 
@@ -50,7 +62,6 @@ class FolderDownloader(SubmissionDownloader, ABC):
         url: str,
         dest_dir: str,
         filename: str | None = None,
-        recursive: bool = True,
         overwrite: bool = False,
     ) -> str:
         """Implementation for pulling entire folders."""
