@@ -31,6 +31,18 @@ class GitHubRepoDownloader(FolderDownloader):
         # Clean the repo name (it might end with .git or have trailing slashes)
         repo = repo.replace(".git", "").strip("/")
 
+        # Add Token, if available in the environment, to Session Headers
+        # This enables the downloader to handle private repos that the token is authorized for
+        token = os.getenv("GITHUB_TOKEN")
+
+        if token:
+            self._session.headers.update(
+                {
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                }
+            )
+
         # Determine target path
         target_name = filename if filename else repo
         output_path = os.path.join(dest_dir, target_name)
@@ -45,9 +57,17 @@ class GitHubRepoDownloader(FolderDownloader):
         resp = self._session.get(download_url, stream=True)
 
         if not resp.ok:
-            raise RuntimeError(
-                f"Error {resp.status_code}.\nFailed to download GitHub repo: {url}"
+            # Provide helpful feedback if auth might be the issue
+            error_msg = (
+                f"Failed to download GitHub repo, {url}, (Status: {resp.status_code})."
             )
+
+            if resp.status_code == 401:
+                error_msg += " Unauthenticated: Check your GITHUB_TOKEN."
+            elif resp.status_code == 403:
+                error_msg += " Unauthorized: Check your GITHUB_TOKEN."
+
+            raise RuntimeError(error_msg)
 
         # Extract in memory to avoid temporary files
         with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
