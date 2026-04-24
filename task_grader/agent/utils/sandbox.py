@@ -101,3 +101,32 @@ class CodeSandbox:
                     container.remove(force=True)
                 except Exception as e:  # noqa
                     print(f"Failed to remove container.\n{e}")
+
+    def execute_python_file(
+        self, file_path: str, timeout: int = 10, mem_limit: str = "128m"
+    ) -> dict[str, Any]:
+        """
+        Reads a local .py file and executes its content within the sandbox.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                code = f.read()
+
+            return self.execute_python_snippet(
+                code=code, timeout=timeout, mem_limit=mem_limit
+            )
+
+        except FileNotFoundError:
+            return {
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": f"Error: The file at {file_path} was not found.",
+                "status": "execution_error",
+            }
+        except Exception as e:
+            return {
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": f"Failed to read or execute file: {str(e)}",
+                "status": "execution_error",
+            }
