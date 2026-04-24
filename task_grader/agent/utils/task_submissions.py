@@ -26,6 +26,7 @@ class SubmissionFormat(StrEnum):
     COLAB = "google_colab"
     DOC = "google_doc"
     DRIVE = "google_drive_folder"
+    GITHUB = "github_repo"
 
 
 submission_format_mapping: dict[SubmissionFormat, type[SubmissionDownloader]] = {
