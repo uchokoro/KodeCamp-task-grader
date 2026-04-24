@@ -9,6 +9,7 @@ authors = [{ name = "Anthony Okoro", email = "antoine.okoro@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "docker>=7.1.0",
     "gdown>=6.0.0",
     "jsonpatch>=1.33",
     "langchain>=1.0.5",
