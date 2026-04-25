@@ -3,6 +3,7 @@ import time
 import docker
 
 from typing import Any
+from docker.models.containers import Container
 from docker import errors as docker_errors
 
 
@@ -25,6 +26,27 @@ class CodeSandbox:
         except docker_errors.ImageNotFound:
             print(f"Image {self._image} not found locally. Pulling...")
             self._client.images.pull(self._image)
+
+    @staticmethod
+    def _poll_container_status(container: Container, timeout: int) -> int | None:
+        # Polling Loop: Monitor container status
+        start_time = time.time()
+        exit_code = None  # noqa
+
+        while time.time() - start_time < timeout:
+            container.reload()
+
+            if container.status == "exited":
+                state = container.attrs.get("State", {})
+                exit_code = state.get("ExitCode", -1)
+                break
+
+            time.sleep(0.5)  # Polling interval
+        else:
+            # Loop completed without the container exiting
+            raise Exception(f"timeout: Code execution exceeded {timeout}s limit.")
+
+        return exit_code
 
     def execute_python_snippet(
         self, code: str, timeout: int = 10, mem_limit: str = "128m"
@@ -54,23 +76,7 @@ class CodeSandbox:
             )
 
             container.start()
-
-            # Polling Loop: Monitor container status
-            start_time = time.time()
-            exit_code = None  # noqa
-
-            while time.time() - start_time < timeout:
-                container.reload()
-
-                if container.status == "exited":
-                    state = container.attrs.get("State", {})
-                    exit_code = state.get("ExitCode", -1)
-                    break
-
-                time.sleep(0.5)  # Polling interval
-            else:
-                # Loop completed without the container exiting
-                raise Exception(f"timeout: Code execution exceeded {timeout}s limit.")
+            exit_code = self._poll_container_status(container, timeout)
 
             # Fetch output logs
             stdout = container.logs(stdout=True, stderr=False).decode("utf-8")
@@ -130,3 +136,81 @@ class CodeSandbox:
                 "stderr": f"Failed to read or execute file: {str(e)}",
                 "status": "execution_error",
             }
+
+    def execute_python_module(
+        self,
+        module_path: str,  # Path to the directory or the main .py file
+        timeout: int = 15,
+        mem_limit: str = "128m",
+    ) -> dict[str, Any]:
+        """
+        Executes a local Python file as a module within the sandbox.
+        Handles directory mounting to allow for local imports.
+        """
+        import os
+
+        # Resolve absolute paths for Windows Docker compatibility
+        abs_path = os.path.abspath(module_path)
+        if os.path.isfile(abs_path):
+            workdir = os.path.dirname(abs_path)
+            target_file = os.path.basename(abs_path)
+        else:
+            workdir = abs_path
+            target_file = "main.py"  # Default entry point
+
+        container = None
+
+        execution_logic = f"""
+import sys
+import os
+sys.path.append('/app')
+os.chdir('/app')
+# Execute the target file
+with open('{target_file}', 'r') as f:
+    exec(f.read())
+"""
+        encoded_logic = base64.b64encode(execution_logic.encode("utf-8")).decode(
+            "utf-8"
+        )
+        command = [
+            "python",
+            "-c",
+            f"import base64; exec(base64.b64decode('{encoded_logic}').decode('utf-8'))",
+        ]
+
+        try:
+            container = self._client.containers.create(
+                self._image,
+                command=command,
+                detach=True,
+                # Mount the host directory to /app in the container as Read-Only (ro)
+                volumes={workdir: {"bind": "/app", "mode": "ro"}},
+                mem_limit=mem_limit,
+                memswap_limit=mem_limit,
+                network_disabled=True,
+                cpu_quota=50000,
+            )
+
+            container.start()
+            exit_code = self._poll_container_status(container, timeout)
+
+            stdout = container.logs(stdout=True, stderr=False).decode("utf-8")
+            stderr = container.logs(stdout=False, stderr=True).decode("utf-8")
+
+            return {
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
+                "status": "success",
+            }
+
+        except Exception as e:
+            return {
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": str(e),
+                "status": "execution_error",
+            }
+        finally:
+            if container:
+                container.remove(force=True)
