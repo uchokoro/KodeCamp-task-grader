@@ -7,6 +7,7 @@ from typing import Any
 from dotenv import find_dotenv, load_dotenv
 
 from ...docs import (
+    GitHubRepoDownloader,
     GoogleColabDownloader,
     GoogleDocsDownloader,
     GoogleDriveDownloader,
@@ -30,6 +31,7 @@ class SubmissionFormat(StrEnum):
 
 
 submission_format_mapping: dict[SubmissionFormat, type[SubmissionDownloader]] = {
+    SubmissionFormat.GITHUB: GitHubRepoDownloader,
     SubmissionFormat.COLAB: GoogleColabDownloader,
     SubmissionFormat.DOC: GoogleDocsDownloader,
     SubmissionFormat.DRIVE: GoogleDriveDownloader,
