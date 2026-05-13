@@ -113,7 +113,7 @@ def test_rubric_post_init_rejects_min_passing_score_above_max():
                 )
             ],
         )
-    assert "less than or equal to overall_max_score" in str(excinfo.value)
+    assert "Cannot exceed overall_max_score" in str(excinfo.value)
 
 
 def test_rubric_rejects_empty_criteria():
@@ -326,3 +326,71 @@ def test_criterion_post_init_rejects_non_positive_weight(invalid_weight: float):
     msg = str(excinfo.value)
     assert f"Invalid weight: {invalid_weight}" in msg
     assert "Must be positive" in msg
+
+
+def test_criterion_defaults():
+    """Verify that new semantic fields have correct defaults."""
+    c = Criterion(id="test", name="n", description="d", weight=1.0, scale="0-5")
+    assert c.skill_domain == "General"
+    assert c.bloom_level == "Apply"
+    assert c.performance_levels == {}
+
+
+def test_criterion_rejects_invalid_performance_score():
+    """Verify that performance levels must match the scale boundaries."""
+    with pytest.raises(ValueError) as excinfo:
+        Criterion(
+            id="test",
+            name="n",
+            description="d",
+            weight=1.0,
+            scale="0-5",
+            performance_levels={10: "Exemplary"},  # 10 is invalid for 0-5
+        )
+    assert "out of range" in str(excinfo.value)
+
+
+def test_rubric_serialization_with_metadata(tmp_path: Path):
+    """Ensure the metadata survives the round-trip to JSON."""
+    perf = {
+        0: "Very poor",
+        1: "Poor",
+        2: "Average",
+        3: "Good",
+        4: "Very good",
+        5: "Great",
+    }
+    c = Criterion(
+        id="c1",
+        name="n",
+        description="d",
+        weight=1.0,
+        scale="0-5",
+        skill_domain="Architecture",
+        bloom_level="Create",
+        performance_levels=perf,
+    )
+    r = Rubric("t1", "Title", "Desc", 100, 50, [c])
+
+    r.save_to_json(tmp_path, "meta_test")
+    loaded = Rubric.load_from_json(tmp_path, "meta_test")
+
+    loaded_c = loaded.criteria[0]
+    assert loaded_c.skill_domain == "Architecture"
+    assert loaded_c.bloom_level == "Create"
+    # Note: You might need to cast keys back to int in the load_from_json method!
+    assert loaded_c.performance_levels[5] == "Great"
+
+
+def test_criterion_post_init_rejects_missing_boundary_descriptors():
+    """Verify that a scale must have its min and max points defined."""
+    with pytest.raises(ValueError) as excinfo:
+        Criterion(
+            id="logic",
+            name="Logic",
+            description="...",
+            weight=1.0,
+            scale="0-5",
+            performance_levels={1: "Poor", 4: "Good"},  # Missing 0 and 5
+        )
+    assert "scale boundaries" in str(excinfo.value)

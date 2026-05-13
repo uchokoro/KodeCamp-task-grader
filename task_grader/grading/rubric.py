@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Mapping, get_args
 
@@ -47,6 +47,11 @@ class Criterion:
     description: str
     weight: float
     scale: ScoreScale
+    skill_domain: str = "General"  # e.g., 'Code Quality', 'Logic', 'Security'
+    bloom_level: str = "Apply"  # e.g., 'Analyze', 'Evaluate', 'Create'
+    performance_levels: dict[int, str] = field(
+        default_factory=dict
+    )  # e.g., {5: "Exemplary...", 3: "Proficient..."}
 
     def __post_init__(self):
         if self.scale not in SCORE_SCALE_DESCRIPTIONS:
@@ -56,6 +61,29 @@ class Criterion:
 
         if self.weight <= 0:
             raise ValueError(f"Invalid weight: {self.weight}. Must be positive")
+
+        if self.performance_levels:
+            lo, hi = SCORE_SCALE_NUMERIC_RANGES[self.scale]
+            scores = sorted(self.performance_levels.keys())
+
+            for score in scores:
+                if not (lo <= score <= hi):
+                    raise ValueError(
+                        f"Score {score} in performance_levels out of range for {self.scale}"
+                    )
+
+            if scores[0] != lo or scores[-1] != hi:
+                raise ValueError(
+                    f"Criterion '{self.name}' must define performance levels for "
+                    f"the scale boundaries ({lo} and {hi})."
+                )
+
+            # Contiguity Check
+            # Ensures no 'unexplained' scores exist between defined levels in small scales
+            if self.scale in ["0-1", "0-5"] and len(scores) != (hi - lo + 1):
+                raise ValueError(
+                    f"Criterion '{self.name}' has missing levels for scale {self.scale}."
+                )
 
     def save_to_json(
         self, dest_dir: str | Path, filename: str, indent: int = 4
@@ -83,6 +111,12 @@ class Criterion:
         with open(filepath, "r") as f:
             criterion_data = json.load(f)
 
+        if criterion_data.get("performance_levels") is not None:
+            criterion_data["performance_levels"] = {
+                int(key): val
+                for key, val in criterion_data["performance_levels"].items()
+            }
+
         return cls(**criterion_data)
 
 
@@ -106,7 +140,7 @@ class Rubric:
 
         if self.min_passing_score > self.overall_max_score:
             raise ValueError(
-                f"Invalid min_passing_score: {self.min_passing_score}. Must be less than or equal to overall_max_score"
+                f"Invalid min_passing_score: {self.min_passing_score}. Cannot exceed overall_max_score"
             )
 
     def save_to_json(
@@ -134,6 +168,14 @@ class Rubric:
 
         with open(filepath, "r") as f:
             rubric_data = json.load(f)
+
+        for criterion in rubric_data["criteria"]:
+            perf_levels = criterion.get("performance_levels")
+            if perf_levels is not None:
+                criterion["performance_levels"] = {
+                    int(key): val
+                    for key, val in criterion["performance_levels"].items()
+                }
 
         rubric_data["criteria"] = [
             Criterion(**criterion) for criterion in rubric_data["criteria"]
