@@ -9,6 +9,7 @@ from langchain_groq import ChatGroq
 
 from .convert_colab_to_txt import extract_ipynb_to_txt
 from .task_grading_setup import build_rubric, extract_txt_file_contents
+from ..reflection_engine import ReflectionLoopExecutor
 from ...grading import EvaluationResult, LLMTaskEvaluator, Rubric
 
 
@@ -43,6 +44,8 @@ def grade_task(
     save_rubric: bool = False,
     max_submissions_to_grade: int = 100,
     submission_filenames_to_omit: list[str] | None = None,
+    use_reflection: bool = False,
+    max_reflection_rounds: int = 1,
 ) -> int:
     # Ensure that all paths are Path objects, and cast them as Path if necessary
     if not isinstance(submissions_dir, Path):
@@ -75,6 +78,13 @@ def grade_task(
             temperature=temperature,
         )
 
+    # Initialize the Reflection Engine if the flag is enabled
+    executor = (
+        ReflectionLoopExecutor(model=llm, max_rounds=max_reflection_rounds)
+        if use_reflection
+        else None
+    )
+
     rubric_dir = Path(rubric_dir)
 
     if not rubric_dir.is_dir():
@@ -85,9 +95,19 @@ def grade_task(
             raise FileNotFoundError(f"File {rubric_gen_prompt_filepath} not found")
 
         rubric_gen_template = extract_txt_file_contents(rubric_gen_prompt_filepath)
-        rubric = build_rubric(
-            assignment=assignment_text, template=rubric_gen_template, model=llm
-        )
+
+        # Wrapped Rubric Generation
+        if use_reflection and executor is not None:
+            rubric = executor.execute_rubric_gen(
+                build_func=build_rubric,
+                assignment=assignment_text,
+                template=rubric_gen_template,
+                model=llm,
+            )
+        else:
+            rubric = build_rubric(
+                assignment=assignment_text, template=rubric_gen_template, model=llm
+            )
 
         if save_rubric:
             rubric.save_to_json(rubric_dir, rubric_filename)
@@ -139,6 +159,7 @@ def grade_task(
         track_name=track_name,
         how_many_submissions_max=max_submissions_to_grade,
         filenames_to_omit=submission_filenames_to_omit,
+        reflection_executor=executor,  # Pass the executor down
     )
 
     write_evaluations_dict_to_file(
@@ -162,6 +183,7 @@ def grade_extracted_submissions(
     track_name: str,
     how_many_submissions_max: int,
     filenames_to_omit: list[str] | None = None,
+    reflection_executor: ReflectionLoopExecutor | None = None,
 ) -> dict[str, Any]:
     if not submissions_directory.is_dir():
         raise NotADirectoryError(f"{submissions_directory} must be a valid directory")
@@ -177,28 +199,45 @@ def grade_extracted_submissions(
         if trainee_name in submissions_to_omit:
             continue
 
+        print(f"--- Grading {trainee_name}'s task submission ---")
+
         submission_text = extract_txt_file_contents(filepath)
-        print(
-            f"\nExtract from {trainee_name}'s submission text:\n{submission_text[:100]}"
-        )  # remove
+
         try:
-            trainee_evaluation: EvaluationResult = evaluator.evaluate(
-                rubric=rubric,
-                assignment=assignment_text,
-                submission=submission_text,
-                trainee_name=trainee_name,
-                knowledge_area=knowledge_area,
-                cohort_specifics=cohort_specifics,
-                track_name=track_name,
-                other_notes="",
-            )
+            # Wrapped Evaluation
+            if reflection_executor:
+                trainee_evaluation: EvaluationResult = (
+                    reflection_executor.execute_grading(
+                        evaluator_method=evaluator.evaluate,
+                        rubric=rubric,
+                        assignment=assignment_text,
+                        submission=submission_text,
+                        trainee_name=trainee_name,
+                        knowledge_area=knowledge_area,
+                        cohort_specifics=cohort_specifics,
+                        track_name=track_name,
+                        other_notes="",
+                    )
+                )
+            else:
+                print(f"--- Grading {trainee_name}'s task submission ---")
+                trainee_evaluation = evaluator.evaluate(
+                    rubric=rubric,
+                    assignment=assignment_text,
+                    submission=submission_text,
+                    trainee_name=trainee_name,
+                    knowledge_area=knowledge_area,
+                    cohort_specifics=cohort_specifics,
+                    track_name=track_name,
+                    other_notes="",
+                )
 
             evaluations_dict[trainee_name] = {
                 "submission_id": name_to_submission_id[trainee_name]["submission_id"],
                 "submission_date": name_to_submission_id[trainee_name][
                     "submission_date"
                 ],
-                "evaluation": trainee_evaluation,  # was initially wrapped with `asdict`
+                "evaluation": trainee_evaluation,
             }
         except Exception as e:
             evaluations_dict[trainee_name] = {
