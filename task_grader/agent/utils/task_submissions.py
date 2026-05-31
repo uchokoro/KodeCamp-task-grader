@@ -66,6 +66,7 @@ def download_submissions(
     workspace_slug: str = _workspace_slug,
     submission_category: SubmissionCategory = SubmissionCategory.SUBMITTED,
     max_submissions_to_download: int = 2000,
+    is_github_clone: bool = False,
 ) -> dict[str, Any]:
     # Instantiate the LMS client and confirm that access token is `None` by default
     lms_client = LMSClient.from_env()
@@ -99,9 +100,15 @@ def download_submissions(
         }
 
         try:
-            _ = downloader.download(
-                url=submission_url, dest_dir=download_dir, filename=filename
-            )
+            if isinstance(downloader, GitHubRepoDownloader) and is_github_clone:
+                _ = downloader.clone(
+                    url=submission_url, dest_dir=download_dir, filename=filename
+                )
+            else:
+                _ = downloader.download(
+                    url=submission_url, dest_dir=download_dir, filename=filename
+                )
+
             download_count += 1
         except Exception as e:
             print(f"Failed to download {filename}: {e}")
